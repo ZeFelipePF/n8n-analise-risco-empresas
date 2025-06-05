@@ -1,0 +1,380 @@
+{
+  "name": "Consultor de Riscos de Empresas",
+  "nodes": [
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "a20526ff-685e-412d-9c40-a8e13e7cdc2c",
+      "name": "Chat Trigger",
+      "webhookId": "5bdea199-7912-4734-a540-0c771870ecd0"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "db9e84b2-97ae-4549-80f8-73de2a6a7c82",
+              "name": "name",
+              "value": "={{ $json.chatInput.split(';')[0] }} ",
+              "type": "string"
+            },
+            {
+              "id": "166cf3c0-b1c2-4dc3-8087-0ca37f088c34",
+              "name": "cnpj",
+              "value": "={{ $json.chatInput.split(';')[1] }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        0
+      ],
+      "id": "a90a8008-7b4d-4519-8d55-7aaf80c0f050",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "operation": "google_light",
+        "q": "=(\"{{ $json.name }}\" and\"{{ $json.cnpj }}\") and (\n  \"processo\" OR \"ação judicial\" OR \"litígio\" OR \n  \"multa\" OR \"sanção\" OR \"autuação\" OR \"penalidade\" OR \n  \"fraude\" OR \"corrupção\" OR \"escândalo\" OR \"investigação\" OR\n  \"reclamação\" OR \"procon\" OR \"denúncia\" OR \n  \"dívida\" OR \"falência\" OR \"recuperação judicial\" OR \"protesto\" OR \"inadimplência\" OR \"bloqueio judicial\" OR \n  \"vazamento de dados\" OR \"cyberataque\" OR \"incidente de segurança\" OR \n  \"irregularidade\" OR \"condenação\" OR \"passivo\" OR \"fiscal\" OR \"ambiental\" OR \"trabalhista\" OR \"administrativo\" OR\n  \"auditoria negativa\" OR \"Ministério Público\" OR \"CADE\" OR \"TCU\"\n)",
+        "additionalFields": {},
+        "requestOptions": {}
+      },
+      "type": "n8n-nodes-serpapi.serpApi",
+      "typeVersion": 1,
+      "position": [
+        420,
+        400
+      ],
+      "id": "2dc2ea8d-8438-4d28-a43d-b9170d7331a5",
+      "name": "SerpApi",
+      "credentials": {
+        "serpApi": {
+          "id": "e5pZjB3AGKlUuS0h",
+          "name": "SerpApi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "tableId": "EnterpriseRisk",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "name",
+              "fieldValue": "={{ $json.Nome }}"
+            },
+            {
+              "fieldId": "cnpj",
+              "fieldValue": "={{ $json.CNPJ }}"
+            },
+            {
+              "fieldId": "risk",
+              "fieldValue": "={{ $json.Risco }}"
+            },
+            {
+              "fieldId": "justify",
+              "fieldValue": "={{ $json.Justificativa }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2100,
+        400
+      ],
+      "id": "50af636c-3a32-43b8-866d-45d5d2b3fd08",
+      "name": "Supabase",
+      "credentials": {
+        "supabaseApi": {
+          "id": "D814vWohR4MhdSc3",
+          "name": "My Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "organic_results",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        640,
+        400
+      ],
+      "id": "c9e4f952-ece1-4c7d-a74d-5d7eb0a2bd0b",
+      "name": "Split Out"
+    },
+    {
+      "parameters": {
+        "url": "=https://www.googleapis.com/customsearch/v1?key=AIzaSyBcNBV5ATw3YixQIlZSHxl83JvVj1ecVWc&cx=b7e26319c12344674&q={{ $json.link }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        400
+      ],
+      "id": "a58f4669-ca2e-4055-96ae-ce401dfa669d",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Dados para análise:\nTítulo do site: {{ $json[\"items.title\"] }}\nHtmlTitle: {{ $json[\"items.htmlTitle\"] }}\nlink: {{ $json[\"items.link\"] }}\nsnippet: {{ $json[\"items.snippet\"] }}\nhtmlSnippet: {{ $json[\"items.htmlSnippet\"] }}",
+        "options": {
+          "systemMessage": "=Você é um agente inteligente resposável por identificar possíveis fragilidades ou pontos de atenção em uma empresa.\n\nObjetivo: \nDadas as informações sobre a empresa (nome: {{ $('Edit Fields').item.json.name }}, cnpj:{{ $('Edit Fields').item.json.cnpj }}) contidas em title, htmlTitle, Link, Snippet e HtmlSnippet, procure por possíveis fragilidades que possam influenciar o risco para se investir na empresa, como processos, fraudes, reclamações e etc.\n\nFaça uma classificação do risco com base em fatores como, quantidade de fragilidades encontradas, gravidade das fragilidades (corrupção, desvio de dinheiro, pedido de recuperação judicial), pendências jurídicas e etc.\n\nLeve em consideração para avaliar o risco de uma empresa também a capacidade com que ela lida com as fragilidades, se são resolvidas, se agravam-se, se perpetuam até hoje.\n\nImportante: \nSó considere os dados enviados e classifique o risco entre \"Baixo Risco\", \"Risco Moderado\", \"Alto Risco\". Além disso, em caso de dúvida ou ambiguidade entre duas classificações, escolha a mais conservadora. Além disso, desenvolva uma justificativa com os principais pontos que o levarão a classificar o risco, para que o usuário possa analisar. Considere para fins de resposta, trazer o cnpj no formato 99.999.999/9999-99.\n\n\n##SAÍDA ESPERADA\n{\n  'nome_empresa': 'string',\n  'cnpj_empresa': 'string',\n  'risco_empresa': 'string',\n  'justificativa': 'string'\n}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        400
+      ],
+      "id": "d9014de3-ca94-4ff5-897f-cc0d4c9d2fa5",
+      "name": "AI Agent2",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        1580,
+        620
+      ],
+      "id": "9332dcb9-3a3b-46e8-9359-67d1aa1466fd",
+      "name": "OpenAI Chat Model2",
+      "credentials": {
+        "openAiApi": {
+          "id": "5Vq3snBF8Sh9Zg1X",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "7ac1aeb2-c021-4081-a1b8-646dec666f1e",
+              "name": "Nome",
+              "value": "={{ $json.output.split('  \\n') [0]}}",
+              "type": "string"
+            },
+            {
+              "id": "9ff2b1c5-37ec-448b-83b0-f72057c4277a",
+              "name": "CNPJ",
+              "value": "={{ $json.output.split('  \\n') [1]}}",
+              "type": "string"
+            },
+            {
+              "id": "9513073b-585f-487e-9dab-88c440fc015f",
+              "name": "Risco",
+              "value": "={{ $json.output.split('  \\n') [2]}}",
+              "type": "string"
+            },
+            {
+              "id": "48488cee-6da1-49da-9262-2f2c68fc5d9a",
+              "name": "Justificativa",
+              "value": "={{ $json.output.split('  \\n') [3]}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1900,
+        400
+      ],
+      "id": "a15c3203-badc-487a-aa0d-a8ac1440f29f",
+      "name": "Edit Fields1"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "items",
+        "include": "=",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        1100,
+        400
+      ],
+      "id": "f588e096-bb3f-44b9-97ad-3ff975fd6f31",
+      "name": "Split Out1"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "items.title, items.htmlTitle, items.link, items.snippet, items.htmlSnippet",
+        "include": "=",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        1320,
+        400
+      ],
+      "id": "48e8f870-00ba-4453-94c6-59c4f07e4e04",
+      "name": "Split Out2"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Chat Trigger": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "SerpApi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SerpApi": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Split Out1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model2": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent2",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent2": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields1": {
+      "main": [
+        [
+          {
+            "node": "Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase": {
+      "main": [
+        []
+      ]
+    },
+    "Split Out1": {
+      "main": [
+        [
+          {
+            "node": "Split Out2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out2": {
+      "main": [
+        [
+          {
+            "node": "AI Agent2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "0b1c14da-276e-4746-b0e7-228b810aed5f",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "6a3e68edd787ea8fe36ae682502c76db4e97277f74a2b06add948678b814fd14"
+  },
+  "id": "TmQn2Yh8DZ4hGKl7",
+  "tags": []
+}
